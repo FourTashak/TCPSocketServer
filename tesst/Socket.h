@@ -3,11 +3,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <vector>
-#include <deque>
 
 #pragma comment (lib, "Ws2_32.lib")
 
@@ -25,6 +21,8 @@ public:
     ~Connections()
     {
         closesocket(sock_);
+        delete RecBuffer;
+        delete SendBuffer;
     }
     void ReadfromSocket()
     {
@@ -32,7 +30,7 @@ public:
         result = recv(sock_, RecBuffer, sizeof(RecBuffer),0);
         if (result == SOCKET_ERROR)
         {
-            std::cout << "Error receiving data from client: "<< (int*)&Clientaddress_.sin_addr << " error code: " << WSAGetLastError() << std::endl;
+            std::cout << "Error receiving data, error code: " << WSAGetLastError() << std::endl;
         }
     }
     void WritetoSocket()
@@ -41,15 +39,15 @@ public:
         result = recv(sock_, SendBuffer, sizeof(SendBuffer), 0);
         if (result == SOCKET_ERROR)
         {
-            std::cout << "Error sending data to client: "<< (int*)&Clientaddress_.sin_addr <<" error code: " << WSAGetLastError() << std::endl;
+            std::cout << "Error sending data, error code: " << WSAGetLastError() << std::endl;
         }
         else if (result == 0)
         {
-            std::cout << "Connection closed by client: "<< (int*)&Clientaddress_.sin_addr << std::endl;
+            std::cout << "Connection closed by client " << std::endl;
         }
         else
         {
-            std::cout << "Error receiving data from: "<< (int*)&Clientaddress_.sin_addr << " error code: " << WSAGetLastError() << std::endl;
+            std::cout << "Error code: " << WSAGetLastError() << std::endl;
         }
     }
 private:
@@ -57,67 +55,6 @@ private:
     sockaddr_in Clientaddress_ ;
     char RecBuffer[1024];
     char SendBuffer[1024];
-};
-
-class threadPool //
-{
-public:
-    threadPool()
-    {
-        Threads th(std::thread::hardware_concurrency());
-    }
-
-    class Threads //
-    {
-    private:
-        std::vector<std::thread> threads;
-        std::mutex mtx;
-        std::condition_variable cv;
-
-    public:
-        void run()
-        {
-            std::cout << std::this_thread::get_id() << std::endl;
-        }
-        void waitforturn()
-        {
-            std::unique_lock<std::mutex> lck{ mtx };
-            cv.wait(lck);
-            run();
-        }
-        void joinTh()
-        {
-            for (auto& th : threads)
-            {
-                th.join();
-            }
-        }
-        Threads(unsigned int numberofthreads)
-        {
-            numberofthreads = std::thread::hardware_concurrency();
-            for (unsigned int i = 0; i < numberofthreads; i++)
-            {
-                threads.emplace_back(std::thread(&Threads::waitforturn, this));
-                Sleep(200);
-                cv.notify_one();
-                threads[i].join();
-            }
-        }
-
-    };
-    class work //
-    {
-    private:
-
-    public:
-        work()
-        {
-
-        }
-    };
-
-private:
-    std::deque<work> Tasks;
 };
 
 int SocketMain()
@@ -168,18 +105,22 @@ int SocketMain()
     SOCKET clientSocket;
     sockaddr_in clientAddress;
     int clientAddressSize = sizeof(clientAddress);
-    clientSocket = accept(serverSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
-    if (clientSocket != INVALID_SOCKET)
+    std::cout << "waiting for clients" << std::endl;
+    while (true) 
     {
-        Cons.emplace_back(Connections(clientSocket,clientAddress));
-        std::cout << "connected" << std::endl;
-    }
-    else if (clientSocket == INVALID_SOCKET) 
-    {
-        std::cout << "Error accepting connection: " << WSAGetLastError() << std::endl;
-        closesocket(serverSocket);
-        WSACleanup();
-        return 1;
+        clientSocket = accept(serverSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
+        if (clientSocket != INVALID_SOCKET)
+        {
+            Cons.emplace_back(Connections(clientSocket, clientAddress));
+            std::cout << "connected"<< std::endl;
+        }
+        else if (clientSocket == INVALID_SOCKET)
+        {
+            std::cout << "Error accepting connection: " << WSAGetLastError() << std::endl;
+            closesocket(serverSocket);
+            WSACleanup();
+            return 1;
+        }
     }
     // Close the socket and clean up
     closesocket(serverSocket);

@@ -23,5 +23,17 @@
     <ClInclude Include="Socket.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SQL.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Market.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Threadpool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BasicFuns.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
