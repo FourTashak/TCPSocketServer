@@ -80,7 +80,7 @@ auto CustomerMapConstruct()
 
 auto Cus_Map = CustomerMapConstruct();
 
-bool Authenticate(std::string Username, std::string Password)
+bool Authenticate(std::string Username, std::string Password) //Authenticating if the username and password is correct
 {
     const auto& account = Cus_Map;
     if (account.find(Username) != account.end())
@@ -98,7 +98,7 @@ bool Authenticate(std::string Username, std::string Password)
     }
 }
 
-float BuyStock(System::String^ Quantity, System::String^ StockName, Customer& Auth)
+float BuyStock(System::String^ Quantity, System::String^ StockName, Customer& Auth) //
 {
     for (int i = 0; i < Market.size(); i++)
     {
@@ -119,7 +119,6 @@ float BuyStock(System::String^ Quantity, System::String^ StockName, Customer& Au
         }
     }
 }
-
 
 float SellStock(System::String^ Quantity, System::String^ StockName, Customer& Auth)
 {

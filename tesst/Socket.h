@@ -4,11 +4,34 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
+#include "Market.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
 //FD_SET
 //std async
+
+bool LoginAuthReceive(char* Received)
+{
+    std::string Username;
+    std::string Password;
+    for (int i = 0; i < 25; i++)
+    {
+        if (Received[i] != '$')
+            Username += Received[i];
+        else
+        {
+            for (; i < (i + 64); i++)
+            {
+                Password += Received[i];
+            }
+        }
+    }
+    if (Authenticate(Username, Password))
+        return true;
+    else
+        return false;
+}
 
 class Connections
 {
@@ -24,13 +47,27 @@ public:
         delete RecBuffer;
         delete SendBuffer;
     }
-    void ReadfromSocket()
+    void Alive()
+    {
+        if (LoginAuthReceive(RecBuffer) == 1)
+        {
+            while (true)
+            {
+                ReadfromSocket();
+            }
+        }
+    }
+    char* ReadfromSocket()
     {
         int result;
-        result = recv(sock_, RecBuffer, sizeof(RecBuffer),0);
+        result = recv(sock_, RecBuffer, sizeof(RecBuffer), 0);
         if (result == SOCKET_ERROR)
         {
             std::cout << "Error receiving data, error code: " << WSAGetLastError() << std::endl;
+        }
+        else
+        {
+            return RecBuffer;
         }
     }
     void WritetoSocket()
@@ -52,7 +89,7 @@ public:
     }
 private:
     SOCKET sock_;
-    sockaddr_in Clientaddress_ ;
+    sockaddr_in Clientaddress_;
     char RecBuffer[1024];
     char SendBuffer[1024];
 };
@@ -72,6 +109,15 @@ int SocketMain()
     SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (serverSocket == INVALID_SOCKET) {
         std::cout << "Error creating socket: " << WSAGetLastError() << std::endl;
+        WSACleanup();
+        return 1;
+    }
+    u_long nonblockingmode = 1;
+    iResult = ioctlsocket(serverSocket, FIONBIO, &nonblockingmode);
+    if (iResult == SOCKET_ERROR) 
+    {
+        std::cout << "Error setting socket to nonblocking mode: " << WSAGetLastError();
+        closesocket(serverSocket);
         WSACleanup();
         return 1;
     }
@@ -117,6 +163,20 @@ int SocketMain()
         else if (clientSocket == INVALID_SOCKET)
         {
             std::cout << "Error accepting connection: " << WSAGetLastError() << std::endl;
+            if (ioctlsocket(clientSocket, FIONBIO, &nonblockingmode) != 0)
+            {
+                std::cout << "failed to set client socket to nonblocking mode: " << WSAGetLastError() << std::endl;
+                closesocket(clientSocket);
+            }
+            else
+            {
+                Cons.emplace_back(Connections(clientSocket, clientAddress));
+                std::cout << "connected: " << inet_ntoa(clientAddress.sin_addr) << ":" << ntohs(clientAddress.sin_port) << std::endl;
+            }
+        }
+        else if (clientSocket == INVALID_SOCKET)
+        {
+            std::cout << "Error accepting connection from: " << inet_ntoa(clientAddress.sin_addr) << ":" << ntohs(clientAddress.sin_port) << " Error code: " << WSAGetLastError() << std::endl;
             closesocket(serverSocket);
             WSACleanup();
             return 1;
