@@ -3,6 +3,8 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <mutex>
+#include <condition_variable>
 #include "Market.h"
 
 #pragma comment (lib, "Ws2_32.lib")
@@ -32,22 +34,61 @@ bool LoginAuthReceive(char* Received)
         return false;
 }
 
-class FileDescManager
+class threadPool ////////////////////////////////////////////
 {
 public:
-    FileDescManager(int numberofthreads)
+    threadPool()
     {
-        fd_vec.reserve(numberofthreads);
-        SOCKET sok;
-        FD_SET(sok, &fd_vec[0]); //last here
+        Threads th(std::thread::hardware_concurrency());
+        fd_set Readsets;
     }
-    class Connections
+    class Threads ///////////////////////////////////////////
     {
     public:
-        Connections(SOCKET Socket, sockaddr_in clientaddress)
+        
+        void run()
+        {
+            std::cout << std::this_thread::get_id() << std::endl;
+        }
+        void waitforturn()
+        {
+            std::unique_lock<std::mutex> lck{ mtx };
+            cv.wait(lck);
+            run();
+        }
+        void joinTh()
+        {
+            for (auto& th : threads)
+            {
+                th.join();
+            }
+        }
+        Threads(unsigned int numberofthreads)
+        {
+            numberofthreads = std::thread::hardware_concurrency();
+            for (unsigned int i = 0; i < numberofthreads; i++)
+            {
+                threads.emplace_back(std::thread(&Threads::waitforturn, this));
+                Sleep(200);
+                cv.notify_one();
+                threads[i].join();
+            }
+        }
+    private:
+        std::vector<std::thread> threads;
+        std::mutex mtx;
+        std::condition_variable cv;
+
+    };
+
+    class Connections ////////////////////////////////////////////////////////////////////////////////////////////////
+    {
+    public:
+        Connections(SOCKET Socket, sockaddr_in clientaddress,fd_set Set)
         {
             sock_ = Socket;
             Clientaddress_ = clientaddress;
+            FD_SET(Socket, &Set);
         }
         ~Connections()
         {
@@ -102,8 +143,28 @@ public:
         char SendBuffer[1024];
     };
 private:
-    std::vector<fd_set> fd_vec;
+    //std::deque<work> Tasks;
 };
+
+
+
+
+
+class Work ////////////////////////////////
+{
+public:
+    Work()
+    {
+        FD_ZERO(&read_fds);
+    }
+private:
+    fd_set read_fds;
+};
+
+
+
+
+
 
 int SocketMain()
 {
