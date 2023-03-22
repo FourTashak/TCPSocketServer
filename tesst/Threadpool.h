@@ -6,6 +6,7 @@
 #include <vector>
 #include <condition_variable>
 #include <deque>
+#include "Socket.h"
 
 class threadPool //
 {
@@ -17,12 +18,17 @@ public:
 
     class Threads //
     {
-    private:
-        std::vector<std::thread> threads;
-        std::mutex mtx;
-        std::condition_variable cv;
-
     public:
+        class Work
+        {
+        public:
+            Work()
+            {
+                FD_ZERO(&read_fds);
+            }
+        private:
+            fd_set read_fds;
+        };
         void run()
         {
             std::cout << std::this_thread::get_id() << std::endl;
@@ -51,18 +57,12 @@ public:
                 threads[i].join();
             }
         }
-
-    };
-    class work //
-    {
-    public:
-        work()
-        {
-
-        }
     private:
+        std::vector<std::thread> threads;
+        std::mutex mtx;
+        std::condition_variable cv;
 
     };
 private:
-    std::deque<work> Tasks;
+    //std::deque<work> Tasks;
 };

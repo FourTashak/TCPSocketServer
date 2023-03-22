@@ -3,7 +3,6 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <vector>
 #include "Market.h"
 
 #pragma comment (lib, "Ws2_32.lib")
@@ -33,65 +32,77 @@ bool LoginAuthReceive(char* Received)
         return false;
 }
 
-class Connections
+class FileDescManager
 {
 public:
-    Connections(SOCKET Socket, sockaddr_in clientaddress)
+    FileDescManager(int numberofthreads)
     {
-        sock_ = Socket;
-        Clientaddress_ = clientaddress;
+        fd_vec.reserve(numberofthreads);
+        SOCKET sok;
+        FD_SET(sok, &fd_vec[0]); //last here
     }
-    ~Connections()
+    class Connections
     {
-        closesocket(sock_);
-        delete RecBuffer;
-        delete SendBuffer;
-    }
-    void Alive()
-    {
-        if (LoginAuthReceive(RecBuffer) == 1)
+    public:
+        Connections(SOCKET Socket, sockaddr_in clientaddress)
         {
-            while (true)
+            sock_ = Socket;
+            Clientaddress_ = clientaddress;
+        }
+        ~Connections()
+        {
+            closesocket(sock_);
+            delete RecBuffer;
+            delete SendBuffer;
+        }
+        void Alive()
+        {
+            if (LoginAuthReceive(RecBuffer) == 1)
             {
-                ReadfromSocket();
+                while (true)
+                {
+                    ReadfromSocket();
+                }
             }
         }
-    }
-    char* ReadfromSocket()
-    {
-        int result;
-        result = recv(sock_, RecBuffer, sizeof(RecBuffer), 0);
-        if (result == SOCKET_ERROR)
+        char* ReadfromSocket()
         {
-            std::cout << "Error receiving data, error code: " << WSAGetLastError() << std::endl;
+            int result;
+            result = recv(sock_, RecBuffer, sizeof(RecBuffer), 0);
+            if (result == SOCKET_ERROR)
+            {
+                std::cout << "Error receiving data, error code: " << WSAGetLastError() << std::endl;
+            }
+            else
+            {
+                return RecBuffer;
+            }
         }
-        else
+        void WritetoSocket()
         {
-            return RecBuffer;
+            int result;
+            result = recv(sock_, SendBuffer, sizeof(SendBuffer), 0);
+            if (result == SOCKET_ERROR)
+            {
+                std::cout << "Error sending data, error code: " << WSAGetLastError() << std::endl;
+            }
+            else if (result == 0)
+            {
+                std::cout << "Connection closed by client " << std::endl;
+            }
+            else
+            {
+                std::cout << "Error code: " << WSAGetLastError() << std::endl;
+            }
         }
-    }
-    void WritetoSocket()
-    {
-        int result;
-        result = recv(sock_, SendBuffer, sizeof(SendBuffer), 0);
-        if (result == SOCKET_ERROR)
-        {
-            std::cout << "Error sending data, error code: " << WSAGetLastError() << std::endl;
-        }
-        else if (result == 0)
-        {
-            std::cout << "Connection closed by client " << std::endl;
-        }
-        else
-        {
-            std::cout << "Error code: " << WSAGetLastError() << std::endl;
-        }
-    }
+    private:
+        SOCKET sock_;
+        sockaddr_in Clientaddress_;
+        char RecBuffer[1024];
+        char SendBuffer[1024];
+    };
 private:
-    SOCKET sock_;
-    sockaddr_in Clientaddress_;
-    char RecBuffer[1024];
-    char SendBuffer[1024];
+    std::vector<fd_set> fd_vec;
 };
 
 int SocketMain()
@@ -135,7 +146,6 @@ int SocketMain()
         WSACleanup();
         return 1;
     }
-
     // Listen for incoming connections
     iResult = listen(serverSocket, SOMAXCONN);
     if (iResult == SOCKET_ERROR) 
@@ -157,12 +167,6 @@ int SocketMain()
         clientSocket = accept(serverSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
         if (clientSocket != INVALID_SOCKET)
         {
-            Cons.emplace_back(Connections(clientSocket, clientAddress));
-            std::cout << "connected"<< std::endl;
-        }
-        else if (clientSocket == INVALID_SOCKET)
-        {
-            std::cout << "Error accepting connection: " << WSAGetLastError() << std::endl;
             if (ioctlsocket(clientSocket, FIONBIO, &nonblockingmode) != 0)
             {
                 std::cout << "failed to set client socket to nonblocking mode: " << WSAGetLastError() << std::endl;
@@ -178,8 +182,6 @@ int SocketMain()
         {
             std::cout << "Error accepting connection from: " << inet_ntoa(clientAddress.sin_addr) << ":" << ntohs(clientAddress.sin_port) << " Error code: " << WSAGetLastError() << std::endl;
             closesocket(serverSocket);
-            WSACleanup();
-            return 1;
         }
     }
     // Close the socket and clean up
