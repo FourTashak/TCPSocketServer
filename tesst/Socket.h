@@ -37,48 +37,43 @@ bool LoginAuthReceive(char* Received)
 class threadPool ////////////////////////////////////////////
 {
 public:
-    threadPool()
+    threadPool(int numberofthreads)
     {
-        Threads th(std::thread::hardware_concurrency());
-        fd_set Readsets;
+        Threads th(numberofthreads);
+        Readsets.resize(numberofthreads);
+        organizer();
+    }
+    void organizer()
+    {
+        while (true)
+        {
+
+        }
     }
     class Threads ///////////////////////////////////////////
     {
     public:
-        
-        void run()
-        {
-            std::cout << std::this_thread::get_id() << std::endl;
-        }
-        void waitforturn()
-        {
-            std::unique_lock<std::mutex> lck{ mtx };
-            cv.wait(lck);
-            run();
-        }
-        void joinTh()
-        {
-            for (auto& th : threads)
-            {
-                th.join();
-            }
-        }
         Threads(unsigned int numberofthreads)
         {
-            numberofthreads = std::thread::hardware_concurrency();
             for (unsigned int i = 0; i < numberofthreads; i++)
             {
-                threads.emplace_back(std::thread(&Threads::waitforturn, this));
+                threads.emplace_back(std::thread(&Threads::run, this,i));
                 Sleep(200);
-                cv.notify_one();
-                threads[i].join();
+            }
+        }
+        void run(int number)
+        {
+            ThreadNumber = number;
+            while (true)
+            {
+
             }
         }
     private:
         std::vector<std::thread> threads;
         std::mutex mtx;
         std::condition_variable cv;
-
+        int ThreadNumber;
     };
 
     class Connections ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +138,7 @@ public:
         char SendBuffer[1024];
     };
 private:
-    //std::deque<work> Tasks;
+    std::vector<fd_set> Readsets;
 };
 
 
