@@ -36,12 +36,29 @@ bool LoginAuthReceive(char* Received)
 
 class threadPool ////////////////////////////////////////////
 {
+private:
+    std::vector<fd_set> Readsets;
+    friend Connections;
 public:
     threadPool(int numberofthreads)
     {
         Threads th(numberofthreads);
         Readsets.resize(numberofthreads);
         organizer();
+    }
+    int Setmanager() //will loop through the Readsets to deduce which one has the least amount of sockets
+    {
+        auto min = Readsets[0].fd_count;
+        int setindentifier;
+        for (int i = 1 ;i<Readsets.size();i++)
+        {
+            if (min < Readsets[i].fd_count)
+            {
+                min = Readsets[i].fd_count;
+                setindentifier = i;
+            }
+        }
+        return setindentifier;
     }
     void organizer()
     {
@@ -50,6 +67,7 @@ public:
 
         }
     }
+
     class Threads ///////////////////////////////////////////
     {
     public:
@@ -79,11 +97,10 @@ public:
     class Connections ////////////////////////////////////////////////////////////////////////////////////////////////
     {
     public:
-        Connections(SOCKET Socket, sockaddr_in clientaddress,fd_set Set)
+        Connections(SOCKET Socket, sockaddr_in clientaddress)
         {
             sock_ = Socket;
             Clientaddress_ = clientaddress;
-            FD_SET(Socket, &Set);
         }
         ~Connections()
         {
@@ -137,8 +154,6 @@ public:
         char RecBuffer[1024];
         char SendBuffer[1024];
     };
-private:
-    std::vector<fd_set> Readsets;
 };
 
 
@@ -166,7 +181,7 @@ int SocketMain()
     // Initialize Winsock2
     WSADATA wsaData;
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (iResult != 0) 
+    if (iResult != 0)
     {
         std::cout << "WSAStartup failed: " << iResult << std::endl;
         return 1;
@@ -181,7 +196,7 @@ int SocketMain()
     }
     u_long nonblockingmode = 1;
     iResult = ioctlsocket(serverSocket, FIONBIO, &nonblockingmode);
-    if (iResult == SOCKET_ERROR) 
+    if (iResult == SOCKET_ERROR)
     {
         std::cout << "Error setting socket to nonblocking mode: " << WSAGetLastError();
         closesocket(serverSocket);
@@ -195,7 +210,7 @@ int SocketMain()
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(12345); // choose a port number
     iResult = bind(serverSocket, (SOCKADDR*)&serverAddress, sizeof(serverAddress));
-    if (iResult == SOCKET_ERROR) 
+    if (iResult == SOCKET_ERROR)
     {
         std::cout << "Error binding socket: " << WSAGetLastError() << std::endl;
         closesocket(serverSocket);
@@ -204,7 +219,7 @@ int SocketMain()
     }
     // Listen for incoming connections
     iResult = listen(serverSocket, SOMAXCONN);
-    if (iResult == SOCKET_ERROR) 
+    if (iResult == SOCKET_ERROR)
     {
         std::cout << "Error listening on socket: " << WSAGetLastError() << std::endl;
         closesocket(serverSocket);
@@ -218,7 +233,7 @@ int SocketMain()
     sockaddr_in clientAddress;
     int clientAddressSize = sizeof(clientAddress);
     std::cout << "waiting for clients" << std::endl;
-    while (true) 
+    while (true)
     {
         clientSocket = accept(serverSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
         if (clientSocket != INVALID_SOCKET)
