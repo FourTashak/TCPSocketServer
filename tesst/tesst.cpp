@@ -1,8 +1,8 @@
-//#include "Threadpool.h"
+#include "Socket.h"
 
 int main()
 {
-    /*threadPool thpool;
-    system("pause");*/
-    SocketMain();
+    threadPool thpool(std::thread::hardware_concurrency());
+    system("pause");
+
 }

@@ -6,7 +6,8 @@
 #include <condition_variable>
 #include <WinSock2.h>
 #include <ws2tcpip.h>
-#include "Market.h"
+#include <vector>
+//#include "Market.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
@@ -29,18 +30,17 @@ bool LoginAuthReceive(char* Received)
             }
         }
     }
-    if (Authenticate(Username, Password))
+    /*if (Authenticate(Username, Password))
         return true;
     else
-        return false;
+        return false;*/
+    return true;
 }
 
 class threadPool ////////////////////////////////////////////
 {
-    friend Connections;
 private:
     std::vector<fd_set> Readsets;
-    std::vector<Connections> Cons;
 public:
     threadPool(unsigned int numberofthreads)
     {
@@ -116,14 +116,17 @@ public:
                 }
                 else
                 {
-                    Cons.emplace_back(Connections(clientSocket, clientAddress));
                     SetManager(clientSocket);
-                    std::cout << "connected: " << inet_ntoa(clientAddress.sin_addr) << ":" << ntohs(clientAddress.sin_port) << std::endl;
+                    LPWSTR buffer=0;
+                    [&clientSocket, &buffer](){WSAAddressToStringW((LPSOCKADDR)clientSocket, sizeof(clientSocket), NULL, buffer, NULL); };
+                    std::cout << "connected: " << buffer << ":" << ntohs(clientAddress.sin_port) << std::endl;
                 }
             }
             else if (clientSocket == INVALID_SOCKET)
             {
-                std::cout << "Error accepting connection from: " << inet_ntoa(clientAddress.sin_addr) << ":" << ntohs(clientAddress.sin_port) << " Error code: " << WSAGetLastError() << std::endl;
+                LPWSTR buffer = 0;
+                WSAAddressToStringW((LPSOCKADDR)clientSocket, sizeof(clientSocket), NULL, buffer, NULL);
+                std::cout << "Error accepting connection from: " << buffer << ":" << ntohs(clientAddress.sin_port) << " Error code: " << WSAGetLastError() << std::endl;
                 closesocket(serverSocket);
             }
         }
@@ -136,7 +139,7 @@ public:
     int SetSizeFinder() //will loop through the Readsets to deduce which one has the least amount of sockets
     {
         auto min = Readsets[0].fd_count;
-        int setindentifier;
+        int setindentifier = 0;
         for (int i = 1 ;i<Readsets.size();i++)
         {
             if (min > Readsets[i].fd_count)
@@ -168,14 +171,14 @@ public:
             ThreadNumber = number;
             while (true)
             {
-                readsets
+                Sleep(1000000);
             }
         }
     private:
         std::vector<std::thread> threads;
         std::mutex mtx;
         std::condition_variable cv;
-        int ThreadNumber;
+        int ThreadNumber = 0;
     };
 
     class Connections ////////////////////////////////////////////////////////////////////////////////////////////////
