@@ -48,6 +48,20 @@ public:
         Readsets.resize(numberofthreads);
         SocketMain();
     }
+    timeval Timeout(int mode,long Duration)
+    {
+        timeval Timeout;
+        if (mode == 0)
+        {
+            Timeout.tv_sec = Duration;
+            return Timeout;
+        }
+        else if (mode == 1)
+        {
+            Timeout.tv_usec = Duration;
+            return Timeout;
+        }
+    }
     int SocketMain()
     {
         // Initialize Winsock2
@@ -104,30 +118,49 @@ public:
         sockaddr_in clientAddress;
         int clientAddressSize = sizeof(clientAddress);
         std::cout << "waiting for clients" << std::endl;
+        
+        fd_set acceptFds;
+        FD_ZERO(&acceptFds);
+        FD_SET(serverSocket, &acceptFds);
         while (true)
         {
-            clientSocket = accept(serverSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
-            if (clientSocket != INVALID_SOCKET)
+            iResult = select(serverSocket + 1, &acceptFds, NULL, NULL, &Timeout(1, 200));
+            if (iResult == SOCKET_ERROR)
             {
-                if (ioctlsocket(clientSocket, FIONBIO, &nonblockingmode) != 0)
-                {
-                    std::cout << "failed to set client socket to nonblocking mode: " << WSAGetLastError() << std::endl;
-                    closesocket(clientSocket);
-                }
-                else
-                {
-                    SetManager(clientSocket);
-                    LPWSTR buffer=0;
-                    [&clientSocket, &buffer](){WSAAddressToStringW((LPSOCKADDR)clientSocket, sizeof(clientSocket), NULL, buffer, NULL); };
-                    std::cout << "connected: " << buffer << ":" << ntohs(clientAddress.sin_port) << std::endl;
-                }
+                std::cout << "Socket error occured, Error code: " << WSAGetLastError() << std::endl;
+                continue;
             }
-            else if (clientSocket == INVALID_SOCKET)
+            else if (iResult == 0)
             {
-                LPWSTR buffer = 0;
-                WSAAddressToStringW((LPSOCKADDR)clientSocket, sizeof(clientSocket), NULL, buffer, NULL);
-                std::cout << "Error accepting connection from: " << buffer << ":" << ntohs(clientAddress.sin_port) << " Error code: " << WSAGetLastError() << std::endl;
-                closesocket(serverSocket);
+                continue;
+            }
+            else
+            {
+                clientSocket = accept(serverSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
+                if (clientSocket != INVALID_SOCKET)
+                {
+                    if (ioctlsocket(clientSocket, FIONBIO, &nonblockingmode) != 0)
+                    {
+                        std::cout << "failed to set client socket to nonblocking mode: " << WSAGetLastError() << std::endl;
+                        closesocket(clientSocket);
+                    }
+                    else
+                    {
+                        SetManager(clientSocket);
+                        wchar_t buffer[1024];
+                        DWORD bufferLen = sizeof(buffer) / sizeof(wchar_t);
+                        [&clientSocket, &buffer, &bufferLen]() {WSAAddressToStringW((LPSOCKADDR)clientSocket, sizeof(clientSocket), NULL, buffer, &bufferLen); };
+                        std::cout << "connected: " << buffer << ":" << ntohs(clientAddress.sin_port) << std::endl;
+                    }
+                }
+                else if (clientSocket == INVALID_SOCKET)
+                {
+                    wchar_t buffer[1024];
+                    DWORD bufferLen = sizeof(buffer) / sizeof(wchar_t);
+                    WSAAddressToStringW((LPSOCKADDR)clientSocket, sizeof(clientSocket), NULL, buffer, &bufferLen);
+                    std::cout << "Error accepting connection from: " << buffer << ":" << ntohs(clientAddress.sin_port) << " Error code: " << WSAGetLastError() << std::endl;
+                    closesocket(serverSocket);
+                }
             }
         }
         // Close the socket and clean up
@@ -135,7 +168,8 @@ public:
         WSACleanup();
 
         return 0;
-    } 
+    }
+
     int SetSizeFinder() //will loop through the Readsets to deduce which one has the least amount of sockets
     {
         auto min = Readsets[0].fd_count;
