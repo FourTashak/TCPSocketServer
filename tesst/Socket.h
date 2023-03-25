@@ -39,28 +39,24 @@ bool LoginAuthReceive(char* Received)
 
 class threadPool ////////////////////////////////////////////
 {
+    class Connections;
 private:
     std::vector<fd_set> Readsets;
+    std::vector<std::vector<Connections>> Cons;
 public:
     threadPool(unsigned int numberofthreads)
     {
-        Threads th(numberofthreads);
+        Cons.resize(numberofthreads);
+        Threads th(numberofthreads,&Cons,&Readsets);
         Readsets.resize(numberofthreads);
         SocketMain();
     }
-    timeval Timeout(int mode,long Duration)
+    timeval Timeout(long Second,long millisecond)
     {
         timeval Timeout;
-        if (mode == 0)
-        {
-            Timeout.tv_sec = Duration;
-            return Timeout;
-        }
-        else if (mode == 1)
-        {
-            Timeout.tv_usec = Duration;
-            return Timeout;
-        }
+        Timeout.tv_sec = Second;
+        Timeout.tv_usec = millisecond;
+        return Timeout;
     }
     int SocketMain()
     {
@@ -122,9 +118,14 @@ public:
         fd_set acceptFds;
         FD_ZERO(&acceptFds);
         FD_SET(serverSocket, &acceptFds);
+        timeval T;
+        T.tv_usec = 500000;
+        T.tv_sec = 0;
         while (true)
         {
-            iResult = select(serverSocket + 1, &acceptFds, NULL, NULL, &Timeout(1, 200));
+            FD_ZERO(&acceptFds);
+            FD_SET(serverSocket, &acceptFds);
+            iResult = select(serverSocket + 1, &acceptFds, NULL, NULL, &T);
             if (iResult == SOCKET_ERROR)
             {
                 std::cout << "Socket error occured, Error code: " << WSAGetLastError() << std::endl;
@@ -146,7 +147,7 @@ public:
                     }
                     else
                     {
-                        SetManager(clientSocket);
+                        SetManager(clientSocket,clientAddress);
                         wchar_t buffer[1024];
                         DWORD bufferLen = sizeof(buffer) / sizeof(wchar_t);
                         [&clientSocket, &buffer, &bufferLen]() {WSAAddressToStringW((LPSOCKADDR)clientSocket, sizeof(clientSocket), NULL, buffer, &bufferLen); };
@@ -184,28 +185,34 @@ public:
         }
         return setindentifier;
     }
-    void SetManager(SOCKET clientsocket)
+    void SetManager(SOCKET clientsocket,sockaddr_in Clientaddress)
     {
-        FD_SET(clientsocket, &Readsets[SetSizeFinder()]);
+        int i = SetSizeFinder();
+        FD_SET(clientsocket, &Readsets[i]);
+        Cons[i].push_back(Connections(clientsocket, Clientaddress));
     }
 
     class Threads ///////////////////////////////////////////
     {
     public:
-        Threads(unsigned int numberofthreads)
+        Threads(unsigned int numberofthreads, std::vector<std::vector<Connections>> *ConVec,std::vector<fd_set> *ReadVec)
         {
             for (unsigned int i = 0; i < numberofthreads; i++)
             {
-                threads.emplace_back(std::thread(&Threads::run, this, i));
+                threads.emplace_back(std::thread(&Threads::run, this, i,ConVec,ReadVec));
                 Sleep(200);
             }
         }
-        void run(int number)
+        void run(int number, std::vector<std::vector<Connections>> *ConVec, std::vector<fd_set> *ReadVec)
         {
             ThreadNumber = number;
+            timeval t;
+            t.tv_usec = 100000;
+            t.tv_sec = 0;
+            /*Sleep(100000000);*/
             while (true)
             {
-                Sleep(1000000);
+                select(0, &(*ReadVec)[ThreadNumber], NULL, NULL, &t);
             }
         }
     private:
@@ -217,6 +224,8 @@ public:
 
     class Connections ////////////////////////////////////////////////////////////////////////////////////////////////
     {
+        friend Threads;
+        friend threadPool;
     public:
         Connections(SOCKET Socket, sockaddr_in clientaddress)
         {
@@ -274,6 +283,7 @@ public:
         sockaddr_in Clientaddress_;
         char RecBuffer[1024];
         char SendBuffer[1024];
+        u_int FileDesc;
     };
 };
 
