@@ -209,10 +209,31 @@ public:
             timeval t;
             t.tv_usec = 100000;
             t.tv_sec = 0;
-            /*Sleep(100000000);*/
             while (true)
             {
-                select(0, &(*ReadVec)[ThreadNumber], NULL, NULL, &t);
+                FD_ZERO(&(ReadVec[ThreadNumber]));
+                for (int i = 0; i < ConVec[ThreadNumber].size(); i++)
+                {
+                    FD_SET((*ConVec)[ThreadNumber][i].sock_, &ReadVec[ThreadNumber]);
+                }
+                int Sel = select(0, &(*ReadVec)[ThreadNumber], NULL, NULL, &t);
+                if (Sel == SOCKET_ERROR)
+                    std::cout << "Socket Error" << std::endl;
+                else if (Sel == 0) {/*timeout*/}
+                else
+                {
+                    for (int i = 0; i < ReadVec->size(); i++)
+                    {
+                        if (FD_ISSET(&(*ConVec)[ThreadNumber][i], &(*ReadVec)[ThreadNumber]))
+                        {
+                            char buffer[1024];
+                            int bytes_rec = recv((*ConVec)[ThreadNumber][i].sock_,buffer,sizeof(buffer), 0);
+                            if (bytes_rec == -1) { std::cout << "Socket Error" << std::endl; }
+                            else if (bytes_rec == 0) {/*socket closed*/}
+                            else {}
+                        }
+                    }
+                }
             }
         }
     private:
@@ -283,7 +304,6 @@ public:
         sockaddr_in Clientaddress_;
         char RecBuffer[1024];
         char SendBuffer[1024];
-        u_int FileDesc;
     };
 };
 
