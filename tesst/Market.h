@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include <string>
 #include <unordered_map>
 #include "BasicFuns.h"
 
@@ -39,6 +38,7 @@ struct Customer
     std::string Name;
     std::string password;
     float Balance;
+    bool logged_in = false;
 
     std::vector<Shares> Customershares;
 };
@@ -80,75 +80,87 @@ auto CustomerMapConstruct()
 
 auto Cus_Map = CustomerMapConstruct();
 
-bool Authenticate(std::string Username, std::string Password) //Authenticating if the username and password is correct
+const Customer Authenticate(std::string Username, std::string Password) //Authenticating if the username and password is correct
 {
     const auto& account = Cus_Map;
+    Customer Null;
+    Null.id = -1;
     if (account.find(Username) != account.end())
     {
         const Customer& Acc = account.at(Username);
         if (Acc.password == sha256(Password))
         {
-            return true;
+            return Acc;
         }
-        return false;
+        return Null;
     }
     else
     {
-        return false;
+        return Null;
     }
 }
 
-float BuyStock(System::String^ Quantity, System::String^ StockName, Customer& Auth) //
+bool BuyStock(int Qant, std::string StockName, Customer& Auth) //
 {
-    for (int i = 0; i < Market.size(); i++)
+    if ((Stock_Map[StockName].price * Qant) <= Auth.Balance)
     {
-        if (Market[i].Name == Cstring_to_String(StockName))
+        for (int i = 0; i < Market.size(); i++)
         {
-            for (int j = 0; j < Auth.Customershares.size(); j++)
+            if (Market[i].Name == StockName)
             {
-                if (Auth.Customershares[j].Share_Name == Market[i].Name)
+                for (int j = 0; j < Auth.Customershares.size(); j++)
                 {
-                    int Qant = int::Parse(Quantity);
-                    Auth.Customershares[j].Share_Quantity += Qant;
-                    return Auth.Balance -= (Market[i].price * Qant);
-                }
-            }
-            int Qant = int::Parse(Quantity);
-            Auth.Customershares.push_back(Shares(Cstring_to_String(StockName), Qant));
-            return Auth.Balance -= (Market[i].price * Qant);
-        }
-    }
-}
-
-float SellStock(System::String^ Quantity, System::String^ StockName, Customer& Auth)
-{
-    for (int i = 0; i < Market.size(); i++)
-    {
-        if (Market[i].Name == Cstring_to_String(StockName))
-        {
-            for (int j = 0; j < Auth.Customershares.size(); j++)
-            {
-                if (Auth.Customershares[j].Share_Name == Market[i].Name)
-                {
-                    int quant = int::Parse(Quantity);
-                    Auth.Customershares[j].Share_Quantity -= quant;
-                    if (Auth.Customershares[j].Share_Quantity == 0)
+                    if (Auth.Customershares[j].Share_Name == Market[i].Name)
                     {
-                        Auth.Customershares.erase(Auth.Customershares.begin() + j);
+                        Auth.Customershares[j].Share_Quantity += Qant;
+                        Auth.Balance -= (Market[i].price * Qant);
+                        return true;
                     }
-                    return Auth.Balance += (Market[i].price * quant);
+                }
+                Auth.Customershares.push_back(Shares(StockName, Qant));
+                Auth.Balance -= (Market[i].price * Qant);
+                return true;
+            }
+        }
+    }
+    else
+        return false;
+}
+
+bool SellStock(int quant, std::string StockName, Customer& Auth)
+{
+    for (int i = 0; i < Market.size(); i++)
+    {
+        if (Market[i].Name == StockName)
+        {
+            for (int j = 0; j < Auth.Customershares.size(); j++)
+            {
+                if (Auth.Customershares[j].Share_Name == Market[i].Name)
+                {
+                    if (Auth.Customershares[j].Share_Quantity >= quant)
+                    {
+                        Auth.Customershares[j].Share_Quantity -= quant;
+                        Auth.Balance += (quant * Market[i].price);
+                        if (Auth.Customershares[j].Share_Quantity == 0)
+                        {
+                            Auth.Customershares.erase(Auth.Customershares.begin() + j);
+                            return true;
+                        }
+                        return true;
+                    }
+                    return false;
                 }
             }
         }
     }
 }
 
-float getprice(System::String^ Name, System::String^ Quantity)
+float getprice(std::string Name, std::string Quantity)
 {
     if (Quantity != "")
     {
-        int quant = int::Parse(Quantity);
-        std::string realname = Cstring_to_String(Name);
+        int quant = stoi(Quantity);
+        std::string realname = Name;
         for (int i = 0; i < Market.size(); i++)
         {
             if (Market[i].Name == realname)
@@ -159,23 +171,24 @@ float getprice(System::String^ Name, System::String^ Quantity)
     }
 }
 
-System::Object^ stocklist()
-{
-    array<System::Object^>^ StockArray;
-    System::Array::Resize(StockArray, Market.size());
-    for (int i = 0; i < Market.size(); i++)
-    {
-        StockArray[i] = StdStringToCString(Market[i].Name);
-    }
-    return StockArray;
-}
+//make a function which will send the stock list to the client
+//System::Object^ stocklist()
+//{
+//    array<System::Object^>^ StockArray;
+//    System::Array::Resize(StockArray, Market.size());
+//    for (int i = 0; i < Market.size(); i++)
+//    {
+//        StockArray[i] = StdStringToCString(Market[i].Name);
+//    }
+//    return StockArray;
+//}
 
-bool DoesCustomerHaveShare(System::Object^ Share, System::String^ Quantity, Customer& Auth)
+bool DoesCustomerHaveShare(std::string Share, std::string Quantity, Customer& Auth)
 {
     if (Quantity != "")
     {
-        std::string Realshare = Cstring_to_String(Share->ToString());
-        int realQuant = int::Parse(Quantity);
+        std::string Realshare = Share;
+        int realQuant = stoi(Quantity);
         for (int i = 0; i < Auth.Customershares.size(); i++)
         {
             if (Auth.Customershares[i].Share_Name == Realshare && Auth.Customershares[i].Share_Quantity >= realQuant && realQuant > 0)

@@ -7,35 +7,13 @@
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 #include <vector>
-//#include "Market.h"
+#include <string>
+#include "Market.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
 //FD_SET
 //std async
-
-bool LoginAuthReceive(char* Received)
-{
-    std::string Username;
-    std::string Password;
-    for (int i = 0; i < 25; i++)
-    {
-        if (Received[i] != '$')
-            Username += Received[i];
-        else
-        {
-            for (; i < (i + 64); i++)
-            {
-                Password += Received[i];
-            }
-        }
-    }
-    /*if (Authenticate(Username, Password))
-        return true;
-    else
-        return false;*/
-    return true;
-}
 
 class threadPool ////////////////////////////////////////////
 {
@@ -47,9 +25,18 @@ public:
     threadPool(unsigned int numberofthreads)
     {
         Cons.resize(numberofthreads);
+        Construct_Vecs(numberofthreads);
         Threads th(numberofthreads,&Cons,&Readsets);
-        Readsets.resize(numberofthreads);
         SocketMain();
+    }
+    void Construct_Vecs(int size)
+    {
+        fd_set Temp;
+        FD_ZERO(&Temp);
+        for (int i = 0; i < size; i++)
+        {
+            Readsets.push_back(Temp);
+        }
     }
     timeval Timeout(long Second,long millisecond)
     {
@@ -200,47 +187,67 @@ public:
             for (unsigned int i = 0; i < numberofthreads; i++)
             {
                 threads.emplace_back(std::thread(&Threads::run, this, i,ConVec,ReadVec));
-                Sleep(200);
+                threads[i].detach();
             }
         }
         void run(int number, std::vector<std::vector<Connections>> *ConVec, std::vector<fd_set> *ReadVec)
         {
-            ThreadNumber = number;
             timeval t;
             t.tv_usec = 100000;
             t.tv_sec = 0;
             while (true)
             {
-                FD_ZERO(&(ReadVec[ThreadNumber]));
-                for (int i = 0; i < ConVec[ThreadNumber].size(); i++)
-                {
-                    FD_SET((*ConVec)[ThreadNumber][i].sock_, &ReadVec[ThreadNumber]);
-                }
-                int Sel = select(0, &(*ReadVec)[ThreadNumber], NULL, NULL, &t);
-                if (Sel == SOCKET_ERROR)
-                    std::cout << "Socket Error" << std::endl;
-                else if (Sel == 0) {/*timeout*/}
-                else
-                {
-                    for (int i = 0; i < ReadVec->size(); i++)
-                    {
-                        if (FD_ISSET(&(*ConVec)[ThreadNumber][i], &(*ReadVec)[ThreadNumber]))
-                        {
-                            char buffer[1024];
-                            int bytes_rec = recv((*ConVec)[ThreadNumber][i].sock_,buffer,sizeof(buffer), 0);
-                            if (bytes_rec == -1) { std::cout << "Socket Error" << std::endl; }
-                            else if (bytes_rec == 0) {/*socket closed*/}
-                            else {}
-                        }
-                    }
-                }
+                Sleep(50);
+                FD_ZERO(&(ReadVec[number]));
+                for (int i = 0; i < (*ConVec)[number].size(); i++)
+				{
+                    FD_SET((*ConVec)[number][i].sock_, &(*ReadVec)[number]);
+				}
+                int Sel = select(FD_SETSIZE, &(*ReadVec)[number], NULL, NULL, &t);
+				if (Sel == SOCKET_ERROR)
+				{
+					std::cout << "Socket Error at thread number : " << number<< std::endl;
+					Sleep(50);
+				}
+				else if (Sel == 0) { Sleep(50); }
+				else
+				{
+					for (int i = 0; i < ReadVec->size(); i++)
+					{
+						if (FD_ISSET((*ConVec)[number][i].sock_, &(*ReadVec)[number]))
+						{
+							char buffer[1024];
+							int bytes_rec = recv((*ConVec)[number][i].sock_, buffer, sizeof(buffer), 0);
+							if (bytes_rec == -1) { std::cout << "Socket Error" << std::endl; }
+							else if (bytes_rec == 0) // If connection is no longer alive
+							{
+								ConVec->erase(ConVec[number].begin() + i);
+								FD_CLR((*ConVec)[number][i].sock_, &(*ReadVec)[number]);
+							}
+							else //If connection is not closed and there is data waiting to be read on socket
+							{
+								if ((*ConVec)[number][i].DataStream(buffer))
+								{
+									int result = send((*ConVec)[number][i].sock_, "Success", 7, 0);
+									if (result == SOCKET_ERROR)
+										std::cout << "Sending confirmation failed, error code :" << WSAGetLastError() << std::endl;
+								}
+								else
+								{
+									int result = send((*ConVec)[number][i].sock_, "Success", 7, 0);
+									if (result == SOCKET_ERROR)
+										std::cout << "Sending error of confirmation failed, error code: " << WSAGetLastError() << std::endl;
+								}
+							}
+						}
+					}
+				}
             }
         }
     private:
         std::vector<std::thread> threads;
         std::mutex mtx;
         std::condition_variable cv;
-        int ThreadNumber = 0;
     };
 
     class Connections ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -256,54 +263,111 @@ public:
         ~Connections()
         {
             closesocket(sock_);
-            delete RecBuffer;
-            delete SendBuffer;
+            ThisCustomer.logged_in = false;
+            Cus_Map.insert({Name,ThisCustomer});
         }
-        void Alive()
+        bool DataStream(char* Received)
         {
-            if (LoginAuthReceive(RecBuffer) == 1)
+        #define Login 1
+        #define Buy 2
+        #define Sell 3
+
+            if (std::stoi(&Received[0]) == Login)
             {
-                while (true)
+                std::string username;
+                std::string password;
+                for (int i = 2; i < 25; i++)
                 {
-                    ReadfromSocket();
+                    if (Received[i] != '$')
+                        username += Received[i];
+                    else
+                    {
+                        for (i += 1; i < (i + 64); i++)
+                        {
+                            if (Received[i] != '$')
+                                password += Received[i];
+                            else
+                                break;
+                        }
+                        break;
+                    }
+                }
+                Customer dummy;
+                dummy = Authenticate(username, password);
+                if (dummy.id==-1)
+                    return false;
+                else
+                {
+                    Cus_Map[username].logged_in = true;
+                    ThisCustomer = dummy;
+                    Name = username;
+                    return true;
                 }
             }
-        }
-        char* ReadfromSocket()
-        {
-            int result;
-            result = recv(sock_, RecBuffer, sizeof(RecBuffer), 0);
-            if (result == SOCKET_ERROR)
+            else if (std::stoi(&Received[0]) == Buy)
             {
-                std::cout << "Error receiving data, error code: " << WSAGetLastError() << std::endl;
+                std::string StockName;
+                int Amount;
+                std::string Buffer;
+                for (int i = 2; i < 6; i++)
+                {
+                    if (Received[i] != '$')
+                        Buffer += Received[i];
+                    else
+                    {
+                        StockName = Buffer;
+                        Buffer.clear();
+                        for (i += 1; i < (i + 6); i++)
+                        {
+                            if (Received[i] != '$')
+                                Buffer += Received[i];
+                            else
+                                break;
+                        }
+                        Amount = std::stoi(Buffer);
+                        break;
+                    }
+                }
+                if (BuyStock(Amount, StockName, this->ThisCustomer))
+                    return true;
+                else
+                    return false;
             }
-            else
+            else if (Received[0] == Sell)
             {
-                return RecBuffer;
-            }
-        }
-        void WritetoSocket()
-        {
-            int result;
-            result = recv(sock_, SendBuffer, sizeof(SendBuffer), 0);
-            if (result == SOCKET_ERROR)
-            {
-                std::cout << "Error sending data, error code: " << WSAGetLastError() << std::endl;
-            }
-            else if (result == 0)
-            {
-                std::cout << "Connection closed by client " << std::endl;
-            }
-            else
-            {
-                std::cout << "Error code: " << WSAGetLastError() << std::endl;
+                std::string StockName;
+                int Amount;
+                std::string Buffer;
+                for (int i = 2; i < 6; i++)
+                {
+                    if (Received[i] != '$')
+                        Buffer += Received[i];
+                    else
+                    {
+                        StockName = Buffer;
+                        Buffer.clear();
+                        for (i += 1; i < (i + 6); i++)
+                        {
+                            if (Received[i] != '$')
+                                Buffer += Received[i];
+                            else
+                                break;
+                        }
+                        Amount = std::stoi(Buffer);
+                        break;
+                    }
+                }
+                if (SellStock(Amount, StockName, this->ThisCustomer))
+                    return true;
+                else
+                    return false;
             }
         }
     private:
         SOCKET sock_;
         sockaddr_in Clientaddress_;
-        char RecBuffer[1024];
-        char SendBuffer[1024];
+        std::string Name;
+        Customer ThisCustomer;
     };
 };
 

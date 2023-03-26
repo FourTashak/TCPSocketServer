@@ -1,4 +1,5 @@
 #pragma once
+#pragma warning(disable : 4996)
 #include <sstream>
 #include <iomanip>
 #include <random>
@@ -23,6 +24,7 @@ std::string generate_salt()
 
 std::string sha256(const std::string str)
 {
+
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
