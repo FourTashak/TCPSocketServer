@@ -2,6 +2,6 @@
 
 int main()
 {
-    threadPool thpool(std::thread::hardware_concurrency());
+    threadPool thpool(1);
     system("pause");
 }

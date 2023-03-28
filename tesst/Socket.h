@@ -25,8 +25,9 @@ public:
     threadPool(unsigned int numberofthreads)
     {
         Cons.resize(numberofthreads);
+        Readsets.reserve(numberofthreads);
         Construct_Vecs(numberofthreads);
-        Threads th(numberofthreads,&Cons,&Readsets);
+        Threads th(numberofthreads,Cons,Readsets);
         SocketMain();
     }
     void Construct_Vecs(int size)
@@ -35,6 +36,7 @@ public:
         FD_ZERO(&Temp);
         for (int i = 0; i < size; i++)
         {
+            Cons[i].reserve(FD_SETSIZE);
             Readsets.push_back(Temp);
         }
     }
@@ -176,34 +178,38 @@ public:
     {
         int i = SetSizeFinder();
         FD_SET(clientsocket, &Readsets[i]);
-        Cons[i].push_back(Connections(clientsocket, Clientaddress));
+        Cons[i].emplace_back(Connections(clientsocket, Clientaddress));
     }
 
     class Threads ///////////////////////////////////////////
     {
     public:
-        Threads(unsigned int numberofthreads, std::vector<std::vector<Connections>> *ConVec,std::vector<fd_set> *ReadVec)
+        Threads(unsigned int numberofthreads, std::vector<std::vector<Connections>> &ConVec,std::vector<fd_set> &ReadVec)
         {
             for (unsigned int i = 0; i < numberofthreads; i++)
             {
-                threads.emplace_back(std::thread(&Threads::run, this, i,ConVec,ReadVec));
+                threads.emplace_back(std::thread(&Threads::run, this, i, std::ref(ConVec), std::ref(ReadVec)));
                 threads[i].detach();
             }
         }
-        void run(int number, std::vector<std::vector<Connections>> *ConVec, std::vector<fd_set> *ReadVec)
+        void run(int number, std::vector<std::vector<Connections>> &ConVec, std::vector<fd_set> &ReadVec)
         {
             timeval t;
             t.tv_usec = 100000;
             t.tv_sec = 0;
             while (true)
             {
+                int Sel = 0;
                 Sleep(50);
                 FD_ZERO(&(ReadVec[number]));
-                for (int i = 0; i < (*ConVec)[number].size(); i++)
+                for (int i = 0; i < ConVec[number].size(); i++)
 				{
-                    FD_SET((*ConVec)[number][i].sock_, &(*ReadVec)[number]);
+                    FD_SET(ConVec[number][i].sock_, &ReadVec[number]);
 				}
-                int Sel = select(FD_SETSIZE, &(*ReadVec)[number], NULL, NULL, &t);
+                if(ReadVec[number].fd_count > 0)
+                {
+                    Sel = select(FD_SETSIZE, &ReadVec[number], NULL, NULL, &t);
+                }
 				if (Sel == SOCKET_ERROR)
 				{
 					std::cout << "Socket Error at thread number : " << number<< std::endl;
@@ -212,29 +218,29 @@ public:
 				else if (Sel == 0) { Sleep(50); }
 				else
 				{
-					for (int i = 0; i < ReadVec->size(); i++)
+					for (int i = 0; i < ReadVec.size(); i++)
 					{
-						if (FD_ISSET((*ConVec)[number][i].sock_, &(*ReadVec)[number]))
+						if (FD_ISSET(ConVec[number][i].sock_, &ReadVec[number]))
 						{
 							char buffer[1024];
-							int bytes_rec = recv((*ConVec)[number][i].sock_, buffer, sizeof(buffer), 0);
+							int bytes_rec = recv(ConVec[number][i].sock_, buffer, sizeof(buffer), 0);
 							if (bytes_rec == -1) { std::cout << "Socket Error" << std::endl; }
 							else if (bytes_rec == 0) // If connection is no longer alive
 							{
-								ConVec->erase(ConVec[number].begin() + i);
-								FD_CLR((*ConVec)[number][i].sock_, &(*ReadVec)[number]);
+                                ConVec[number].erase(ConVec[number].begin()+i);
+								FD_CLR(ConVec[number][i].sock_, &ReadVec[number]);
 							}
 							else //If connection is not closed and there is data waiting to be read on socket
 							{
-								if ((*ConVec)[number][i].DataStream(buffer))
+								if (ConVec[number][i].DataStream(buffer))
 								{
-									int result = send((*ConVec)[number][i].sock_, "Success", 7, 0);
+									int result = send(ConVec[number][i].sock_, "Success", 7, 0);
 									if (result == SOCKET_ERROR)
 										std::cout << "Sending confirmation failed, error code :" << WSAGetLastError() << std::endl;
 								}
 								else
 								{
-									int result = send((*ConVec)[number][i].sock_, "Success", 7, 0);
+									int result = send(ConVec[number][i].sock_, "Success", 7, 0);
 									if (result == SOCKET_ERROR)
 										std::cout << "Sending error of confirmation failed, error code: " << WSAGetLastError() << std::endl;
 								}
