@@ -136,6 +136,7 @@ public:
                     }
                     else
                     {
+                        
                         SetManager(clientSocket,clientAddress);
                         wchar_t buffer[1024];
                         DWORD bufferLen = sizeof(buffer) / sizeof(wchar_t);
@@ -178,13 +179,14 @@ public:
     {
         int i = SetSizeFinder();
         FD_SET(clientsocket, &Readsets[i]);
-        Cons[i].emplace_back(Connections(clientsocket, Clientaddress));
+        std::unique_ptr<SOCKET> clientsocketnew(new SOCKET(clientsocket));
+        Cons[i].emplace_back(Connections(std::move(clientsocketnew), Clientaddress));
     }
 
     class Threads ///////////////////////////////////////////
     {
     public:
-        Threads(unsigned int numberofthreads, std::vector<std::vector<Connections>> &ConVec,std::vector<fd_set> &ReadVec)
+        Threads(unsigned int numberofthreads, std::vector<std::vector<Connections>>& ConVec, std::vector<fd_set>& ReadVec)
         {
             for (unsigned int i = 0; i < numberofthreads; i++)
             {
@@ -204,7 +206,8 @@ public:
                 FD_ZERO(&(ReadVec[number]));
                 for (int i = 0; i < ConVec[number].size(); i++)
 				{
-                    FD_SET(ConVec[number][i].sock_, &ReadVec[number]);
+                    std::cout << "";
+                    FD_SET(*ConVec[number][i].sock_.get(), &ReadVec[number]);
 				}
                 if(ReadVec[number].fd_count > 0)
                 {
@@ -212,7 +215,7 @@ public:
                 }
 				if (Sel == SOCKET_ERROR)
 				{
-					std::cout << "Socket Error at thread number : " << number<< std::endl;
+					std::cout << "Socket Error at thread number : " << number << std::endl;
 					Sleep(50);
 				}
 				else if (Sel == 0) { Sleep(50); }
@@ -220,27 +223,32 @@ public:
 				{
 					for (int i = 0; i < ReadVec.size(); i++)
 					{
-						if (FD_ISSET(ConVec[number][i].sock_, &ReadVec[number]))
+						if (FD_ISSET(*ConVec[number][i].sock_.get(), &ReadVec[number]))
 						{
 							char buffer[1024];
-							int bytes_rec = recv(ConVec[number][i].sock_, buffer, sizeof(buffer), 0);
-							if (bytes_rec == -1) { std::cout << "Socket Error" << std::endl; }
+							int bytes_rec = recv(*ConVec[number][i].sock_.get(), buffer, sizeof(buffer), 0);
+							if (bytes_rec == -1) 
+                            {
+                                std::cout << "Socket Error" << std::endl;
+                                FD_CLR(*ConVec[number][i].sock_.get(), &ReadVec[number]);
+                                ConVec[number].erase(ConVec[number].begin() + i);
+                            }
 							else if (bytes_rec == 0) // If connection is no longer alive
 							{
+                                FD_CLR(*ConVec[number][i].sock_.get(), &ReadVec[number]);
                                 ConVec[number].erase(ConVec[number].begin()+i);
-								FD_CLR(ConVec[number][i].sock_, &ReadVec[number]);
 							}
 							else //If connection is not closed and there is data waiting to be read on socket
 							{
-								if (ConVec[number][i].DataStream(buffer))
+								if (ConVec[number][i].DataStream(buffer)) //zort
 								{
-									int result = send(ConVec[number][i].sock_, "Success", 7, 0);
+									int result = send(*ConVec[number][i].sock_.get(), "Success", 7, 0);
 									if (result == SOCKET_ERROR)
 										std::cout << "Sending confirmation failed, error code :" << WSAGetLastError() << std::endl;
 								}
 								else
 								{
-									int result = send(ConVec[number][i].sock_, "Success", 7, 0);
+									int result = send(*ConVec[number][i].sock_.get(), "Success", 7, 0);
 									if (result == SOCKET_ERROR)
 										std::cout << "Sending error of confirmation failed, error code: " << WSAGetLastError() << std::endl;
 								}
@@ -256,19 +264,19 @@ public:
         std::condition_variable cv;
     };
 
-    class Connections ////////////////////////////////////////////////////////////////////////////////////////////////
+    class Connections
     {
         friend Threads;
         friend threadPool;
     public:
-        Connections(SOCKET Socket, sockaddr_in clientaddress)
+        Connections(std::unique_ptr<SOCKET> Socket, sockaddr_in clientaddress)
         {
-            sock_ = Socket;
-            Clientaddress_ = clientaddress;
+            sock_.reset(Socket.release());
+			Clientaddress_ = clientaddress;
         }
         ~Connections()
         {
-            closesocket(sock_);
+            closesocket((SOCKET)sock_.get());
             ThisCustomer.logged_in = false;
             Cus_Map.insert({Name,ThisCustomer});
         }
@@ -323,7 +331,9 @@ public:
                     {
                         StockName = Buffer;
                         Buffer.clear();
-                        for (i += 1; i < (i + 6); i++)
+                        int j = (i + 6);
+                        i++;
+                        for (; i < j; i++)
                         {
                             if (Received[i] != '$')
                                 Buffer += Received[i];
@@ -352,7 +362,9 @@ public:
                     {
                         StockName = Buffer;
                         Buffer.clear();
-                        for (i += 1; i < (i + 6); i++)
+                        int j = (i + 6);
+                        i++;
+                        for (; i < j; i++)
                         {
                             if (Received[i] != '$')
                                 Buffer += Received[i];
@@ -370,7 +382,7 @@ public:
             }
         }
     private:
-        SOCKET sock_;
+        std::shared_ptr<SOCKET> sock_;
         sockaddr_in Clientaddress_;
         std::string Name;
         Customer ThisCustomer;

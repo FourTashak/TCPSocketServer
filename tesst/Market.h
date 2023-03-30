@@ -100,7 +100,7 @@ const Customer Authenticate(std::string Username, std::string Password) //Authen
     }
 }
 
-bool BuyStock(int Qant, std::string StockName, Customer& Auth) //
+bool BuyStock(int Qant, std::string StockName, Customer& Auth)
 {
     if ((Stock_Map[StockName].price * Qant) <= Auth.Balance)
     {
