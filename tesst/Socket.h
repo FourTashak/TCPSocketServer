@@ -221,7 +221,7 @@ public:
 				else if (Sel == 0) { Sleep(50); }
 				else
 				{
-					for (int i = 0; i < ReadVec.size(); i++)
+					for (int i = 0; i < ReadVec[number].fd_count; i++)
 					{
 						if (FD_ISSET(*ConVec[number][i].sock_.get(), &ReadVec[number]))
 						{

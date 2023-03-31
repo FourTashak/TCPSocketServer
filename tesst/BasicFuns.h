@@ -6,6 +6,7 @@
 #include <string>
 #include <openssl/sha.h>
 
+
 std::string generate_salt()
 {
     static const char alphanum[] =

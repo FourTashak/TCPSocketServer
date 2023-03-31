@@ -89,10 +89,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Program Files (x86)\OpenSSL-Win32\include;C:\Program Files\Boost\boost_1_81_0</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\OpenSSL-Win32\lib;C:\Program Files\Boost\boost_1_81_0\libs</AdditionalLibraryDirectories>
+      <AdditionalDependencies>C:\Program Files (x86)\OpenSSL-Win32\lib\libcrypto.lib;C:\Program Files (x86)\OpenSSL-Win32\lib\libssl.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -118,13 +121,13 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Program Files\OpenSSL-Win64\include; C:\Program Files\Boost\boost_1_81_0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\OpenSSL-Win64\include;C:\Program Files\Boost\boost_1_81_0;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\SDK\Include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Program Files\OpenSSL-Win64\lib; C:\Program Files\Boost\boost_1_81_0\libs</AdditionalLibraryDirectories>
-      <AdditionalDependencies>C:\Program Files\OpenSSL-Win64\lib\libcrypto.lib; C:\Program Files\OpenSSL-Win64\lib\libssl.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\OpenSSL-Win64\lib;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\SDK\Lib\x64;C:\Program Files\Boost\boost_1_81_0\libs</AdditionalLibraryDirectories>
+      <AdditionalDependencies>C:\Program Files\OpenSSL-Win64\lib\libcrypto.lib;C:\Program Files\OpenSSL-Win64\lib\libssl.lib;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\SDK\Lib\x64\msodbcsql17.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
