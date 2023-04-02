@@ -25,6 +25,11 @@ struct Shares
     std::string Share_Name;
     int Share_Quantity;
 
+    Shares()
+    {
+
+    }
+
     Shares(std::string Name, int Quantity)
     {
         Share_Name = Name;

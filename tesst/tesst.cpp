@@ -1,8 +1,9 @@
 #include "Socket.h"
-#include "SQL.h"
 
 int main()
 {
-    threadPool thpool(std::thread::hardware_concurrency());
+    ServerStartup();
+    /*threadPool thpool(std::thread::hardware_concurrency());*/
+    ServerShutdown();
     system("pause");
 }

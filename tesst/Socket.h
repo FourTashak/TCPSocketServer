@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include "Market.h"
+#include "SQL.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
