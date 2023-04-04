@@ -177,16 +177,6 @@ float getprice(std::string Name, std::string Quantity)
 }
 
 //make a function which will send the stock list to the client
-//System::Object^ stocklist()
-//{
-//    array<System::Object^>^ StockArray;
-//    System::Array::Resize(StockArray, Market.size());
-//    for (int i = 0; i < Market.size(); i++)
-//    {
-//        StockArray[i] = StdStringToCString(Market[i].Name);
-//    }
-//    return StockArray;
-//}
 
 bool DoesCustomerHaveShare(std::string Share, std::string Quantity, Customer& Auth)
 {

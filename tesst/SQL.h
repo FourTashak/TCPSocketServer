@@ -46,6 +46,7 @@ int ServerStartup()
         return 0;
     }
 
+    //Get number of rows from the table named Shares
     if (SQL_SUCCESS != SQLExecDirect(hstmt, (SQLWCHAR*)L"Select count(*) from Shares",SQL_NTS))
     {
         return 0;
@@ -59,7 +60,7 @@ int ServerStartup()
         SQLFreeStmt(hstmt,SQL_CLOSE);
     }
 
-
+    //Get Name and price data from shares
     if (SQL_SUCCESS != SQLExecDirect(hstmt, (SQLWCHAR*)L"Select Name,Price from shares", SQL_NTS))
     {
         return 0;
@@ -79,8 +80,8 @@ int ServerStartup()
         SQLFreeStmt(hstmt, SQL_CLOSE);
     }
 
+    //Get number of columns in the table Customer
     int Columncount;
-
     if (SQL_SUCCESS != SQLExecDirect(hstmt, (SQLWCHAR*)L"Select Count(*) from INFORMATION_SCHEMA.Columns where TABLE_NAME = 'Customer'",SQL_NTS))
     {
         return 0;
@@ -94,6 +95,7 @@ int ServerStartup()
         SQLFreeStmt(hstmt, SQL_CLOSE);
     }
 
+    //Get all data from row from table Customer and put them into Customer Map
     std::string Buf = "Select CustomerID, Name, Password, Balance, ";
     for (int i = 0; i < Market.size(); i++)
     {
@@ -198,6 +200,7 @@ int ServerShutdown()
         return 0;
     }
 
+    //Get number of columns from the table customer
     int Columncount;
     if (SQL_SUCCESS != SQLExecDirect(hstmt, (SQLWCHAR*)L"Select Count(*) from INFORMATION_SCHEMA.Columns where TABLE_NAME = 'Customer'", SQL_NTS))
     {
@@ -216,6 +219,7 @@ int ServerShutdown()
     SQLWCHAR table_name[] = L"Customer";
     SQLCHAR column_name[256];
 
+    //Get name of columns from table Customer
     SQLColumns(hstmt, NULL, 0, NULL, 0, table_name, SQL_NTS, NULL, 0);
     for (int i = 0;SQLFetch(hstmt) == SQL_SUCCESS;i++)
     {
@@ -224,6 +228,7 @@ int ServerShutdown()
     }
     SQLFreeStmt(hstmt, SQL_CLOSE);
 
+    //Update the Database with the new customer information
     for (auto it = Cus_Map.begin(); it != Cus_Map.end(); ++it)
     {
         std::string Statement = "Update Customer Set ";
@@ -259,7 +264,6 @@ int ServerShutdown()
         }
     }
     
-
     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     SQLDisconnect(hdbc);
     SQLFreeHandle(SQL_HANDLE_DBC, hdbc);

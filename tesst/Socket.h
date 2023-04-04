@@ -13,9 +13,6 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
-//FD_SET
-//std async
-
 class threadPool ////////////////////////////////////////////
 {
     class Connections;
@@ -195,6 +192,28 @@ public:
                 threads[i].detach();
             }
         }
+        int SendCusInfo(SOCKET clientsocket,Customer &Cus)
+        {
+            Sleep(200);
+            std::string buffer;
+            for (int i = 0; i < Market.size(); i++)
+                buffer += (Cus.Customershares[i].Share_Name + "$" + std::to_string(Cus.Customershares[i].Share_Quantity) + "$" + std::to_string(Market[i].price) + "$");
+
+            int result = send(clientsocket, buffer.c_str(), buffer.size(), 0);
+            if (result == SOCKET_ERROR)
+            {
+                return false;
+            }
+            buffer.clear();
+            buffer = std::to_string(Cus.Balance);
+            Sleep(1000);
+            result = send(clientsocket, buffer.c_str(), buffer.size(), 0);
+            if (result == SOCKET_ERROR)
+            {
+                return false;
+            }
+            return true;
+        }
         void run(int number, std::vector<std::vector<Connections>> &ConVec, std::vector<fd_set> &ReadVec)
         {
             timeval t;
@@ -207,7 +226,6 @@ public:
                 FD_ZERO(&(ReadVec[number]));
                 for (int i = 0; i < ConVec[number].size(); i++)
 				{
-                    std::cout << "";
                     FD_SET(*ConVec[number][i].sock_.get(), &ReadVec[number]);
 				}
                 if(ReadVec[number].fd_count > 0)
@@ -231,11 +249,14 @@ public:
 							if (bytes_rec == -1) 
                             {
                                 std::cout << "Socket Error" << std::endl;
+                                Cus_Map[ConVec[number][i].Name].logged_in = false;
                                 FD_CLR(*ConVec[number][i].sock_.get(), &ReadVec[number]);
                                 ConVec[number].erase(ConVec[number].begin() + i);
                             }
 							else if (bytes_rec == 0) // If connection is no longer alive
 							{
+                                std::cout << "Socket Error" << std::endl;
+                                Cus_Map[ConVec[number][i].Name].logged_in = false;
                                 FD_CLR(*ConVec[number][i].sock_.get(), &ReadVec[number]);
                                 ConVec[number].erase(ConVec[number].begin()+i);
 							}
@@ -243,13 +264,16 @@ public:
 							{
 								if (ConVec[number][i].DataStream(buffer)) //zort
 								{
-									int result = send(*ConVec[number][i].sock_.get(), "Success", 7, 0);
+									int result = send(*ConVec[number][i].sock_.get(), "1", 3, 0);
 									if (result == SOCKET_ERROR)
 										std::cout << "Sending confirmation failed, error code :" << WSAGetLastError() << std::endl;
-								}
+                                    result = SendCusInfo(*ConVec[number][i].sock_.get(), ConVec[number][i].ThisCustomer);
+                                    if (result == SOCKET_ERROR)
+                                        std::cout << "Sending confirmation failed, error code :" << WSAGetLastError() << std::endl;
+                                }
 								else
 								{
-									int result = send(*ConVec[number][i].sock_.get(), "Success", 7, 0);
+									int result = send(*ConVec[number][i].sock_.get(), "0", 7, 0);
 									if (result == SOCKET_ERROR)
 										std::cout << "Sending error of confirmation failed, error code: " << WSAGetLastError() << std::endl;
 								}
@@ -291,7 +315,7 @@ public:
             {
                 std::string username;
                 std::string password;
-                for (int i = 2; i < 25; i++)
+                for (int i = 1; i < 25; i++)
                 {
                     if (Received[i] != '$')
                         username += Received[i];
@@ -309,7 +333,7 @@ public:
                 }
                 Customer dummy;
                 dummy = Authenticate(username, password);
-                if (dummy.id==-1)
+                if (dummy.id==-1 || dummy.logged_in == true ) 
                     return false;
                 else
                 {
@@ -319,12 +343,12 @@ public:
                     return true;
                 }
             }
-            else if (std::stoi(&Received[0]) == Buy)
+            else if (std::stoi(&Received[0]) == Buy && Cus_Map[Name].logged_in == true)
             {
                 std::string StockName;
                 int Amount;
                 std::string Buffer;
-                for (int i = 2; i < 6; i++)
+                for (int i = 1; i < 6; i++)
                 {
                     if (Received[i] != '$')
                         Buffer += Received[i];
@@ -345,7 +369,7 @@ public:
                         break;
                     }
                 }
-                if (BuyStock(Amount, StockName, this->ThisCustomer))
+                if (BuyStock(Amount, StockName, this->ThisCustomer) && Cus_Map[Name].logged_in == true)
                     return true;
                 else
                     return false;
@@ -355,7 +379,7 @@ public:
                 std::string StockName;
                 int Amount;
                 std::string Buffer;
-                for (int i = 2; i < 6; i++)
+                for (int i = 1; i < 6; i++)
                 {
                     if (Received[i] != '$')
                         Buffer += Received[i];
@@ -376,7 +400,7 @@ public:
                         break;
                     }
                 }
-                if (SellStock(Amount, StockName, this->ThisCustomer))
+                if (SellStock(Amount, StockName, this->ThisCustomer) && Cus_Map[Name].logged_in == true)
                     return true;
                 else
                     return false;

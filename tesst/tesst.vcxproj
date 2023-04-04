@@ -157,7 +157,6 @@
     <ClInclude Include="Market.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="SQL.h" />
-    <ClInclude Include="Threadpool.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
