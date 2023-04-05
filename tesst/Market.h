@@ -1,7 +1,29 @@
 #pragma once
+#pragma warning(disable : 4996)
 #include <vector>
 #include <unordered_map>
-#include "BasicFuns.h"
+#include <sstream>
+#include <iomanip>
+#include <random>
+#include <string>
+#include <openssl/sha.h>
+
+//Hashing function to hash user passwords and compare with the passwords stored in the database
+std::string sha256(const std::string str)
+{
+
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, str.c_str(), str.size());
+    SHA256_Final(hash, &sha256);
+    std::stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
+    }
+    return ss.str();
+}
 
 struct Stonks
 {
@@ -48,8 +70,9 @@ struct Customer
     std::vector<Shares> Customershares;
 };
 
-std::vector<Stonks> Market; //Prices of stocks
+std::vector<Stonks> Market;//Contains Stock names and prices
 
+//overload for the standard hash function
 namespace std
 {
     template<>struct hash<Stonks>
@@ -69,23 +92,12 @@ namespace std
     };
 }
 
-auto StockMapConstruct()
-{
-    std::unordered_map<std::string, Stonks> Stocks;
-    return Stocks;
-}
+std::unordered_map<std::string, Stonks> Stock_Map; //Stock Map
 
-auto Stock_Map = StockMapConstruct();
+std::unordered_map<std::string, Customer> Cus_Map; //Customer Map
 
-auto CustomerMapConstruct()
-{
-    std::unordered_map<std::string, Customer> Customers;
-    return Customers;
-}
-
-auto Cus_Map = CustomerMapConstruct();
-
-const Customer Authenticate(std::string Username, std::string Password) //Authenticating if the username and password is correct
+//Function to authenticate the username and password received from clients
+const Customer Authenticate(std::string Username, std::string Password) 
 {
     const auto& account = Cus_Map;
     Customer Null;
@@ -105,6 +117,7 @@ const Customer Authenticate(std::string Username, std::string Password) //Authen
     }
 }
 
+//Function which calculates and checks if the customer has enough balance to buy shares
 bool BuyStock(int Qant, std::string StockName, Customer& Auth)
 {
     if ((Stock_Map[StockName].price * Qant) <= Auth.Balance)
@@ -132,6 +145,7 @@ bool BuyStock(int Qant, std::string StockName, Customer& Auth)
         return false;
 }
 
+//Function which calculates and checks if the customer has enough shares to sell
 bool SellStock(int quant, std::string StockName, Customer& Auth)
 {
     for (int i = 0; i < Market.size(); i++)
@@ -159,38 +173,4 @@ bool SellStock(int quant, std::string StockName, Customer& Auth)
         }
     }
 }
-
-float getprice(std::string Name, std::string Quantity)
-{
-    if (Quantity != "")
-    {
-        int quant = stoi(Quantity);
-        std::string realname = Name;
-        for (int i = 0; i < Market.size(); i++)
-        {
-            if (Market[i].Name == realname)
-            {
-                return (Market[i].price * quant);
-            }
-        }
-    }
-}
-
-//make a function which will send the stock list to the client
-
-bool DoesCustomerHaveShare(std::string Share, std::string Quantity, Customer& Auth)
-{
-    if (Quantity != "")
-    {
-        std::string Realshare = Share;
-        int realQuant = stoi(Quantity);
-        for (int i = 0; i < Auth.Customershares.size(); i++)
-        {
-            if (Auth.Customershares[i].Share_Name == Realshare && Auth.Customershares[i].Share_Quantity >= realQuant && realQuant > 0)
-                return true;
-        }
-    }
-    return false;
-}
-
 

@@ -131,6 +131,7 @@ int ServerStartup()
         }
         else
         {
+            //creates the customer map from the data received from the database
             while (SQLFetch(hstmt) == SQL_SUCCESS)
             {
                 std::vector<Stonks> TempStonk;

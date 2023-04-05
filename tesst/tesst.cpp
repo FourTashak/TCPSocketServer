@@ -5,5 +5,5 @@ int main()
     ServerStartup();
     threadPool thpool(std::thread::hardware_concurrency());
     ServerShutdown();
-    system("pause");
+    system("Echo Server Shutdown Successful");
 }

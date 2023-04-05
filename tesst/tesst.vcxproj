@@ -153,7 +153,6 @@
     <ClCompile Include="tesst.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BasicFuns.h" />
     <ClInclude Include="Market.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="SQL.h" />
