@@ -2,8 +2,6 @@
 #include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
-#include <mutex>
-#include <condition_variable>
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 #include <vector>
